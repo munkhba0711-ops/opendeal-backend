@@ -9,14 +9,15 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->where('status', 'active');
+        // 1. N+1 гацалтыг засаж user-ийг давхар дуудлаа
+        $query = Product::with('user')->where('status', 'active');
 
         // 1. Төрлөөр шүүх
         if ($request->filled('category')) {
             $query->where('category_name', $request->category);
         }
 
-        // === ЭНД НЭМЭГДСЭН: ХАЙЛТААР ШҮҮХ ===
+        // Хайлтаар шүүх
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
@@ -25,7 +26,6 @@ class ProductController extends Controller
                   ->orWhere('description', 'LIKE', "%{$searchTerm}%");
             });
         }
-        // ===================================
 
         // 2. ТӨЛӨВӨӨР ШҮҮХ
         if ($request->filled('conditions')) {
@@ -33,19 +33,19 @@ class ProductController extends Controller
             $query->whereIn('condition', $conds);
         }
 
-        // 3. Үнээр шүүх
+        // 3. Үнээр шүүх (PostgreSQL дээр гацахгүй ажиллахаар засав)
         if ($request->filled('min_price') && $request->filled('max_price')) {
-            $query->whereRaw('CAST(REPLACE(REPLACE(price, " ₮", ""), ",", "") AS UNSIGNED) BETWEEN ? AND ?', [
+            $query->whereRaw("CAST(REPLACE(REPLACE(price, ' ₮', ''), ',', '') AS INTEGER) BETWEEN ? AND ?", [
                 $request->min_price,
                 $request->max_price
             ]);
         }
 
-        // 4. Эрэмбэлэх
+        // 4. Эрэмбэлэх (PostgreSQL дээр гацахгүй ажиллахаар засав)
         if ($request->sort === 'low') {
-            $query->orderByRaw('CAST(REPLACE(REPLACE(price, " ₮", ""), ",", "") AS UNSIGNED) ASC');
+            $query->orderByRaw("CAST(REPLACE(REPLACE(price, ' ₮', ''), ',', '') AS INTEGER) ASC");
         } elseif ($request->sort === 'high') {
-            $query->orderByRaw('CAST(REPLACE(REPLACE(price, " ₮", ""), ",", "") AS UNSIGNED) DESC');
+            $query->orderByRaw("CAST(REPLACE(REPLACE(price, ' ₮', ''), ',', '') AS INTEGER) DESC");
         } else {
             $query->latest();
         }
