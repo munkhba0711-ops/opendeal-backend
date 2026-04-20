@@ -54,16 +54,17 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // PostgreSQL дээр индекс ашиглан хурдан хайх
+        $user = User::whereRaw('LOWER(email) = ?', [strtolower($request->email)])->first();
 
-        // Хэрэглэгч байгаа эсэх болон нууц үг таарч байгааг шалгах
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'message' => 'Имэйл эсвэл нууц үг буруу байна.'
             ], 401);
         }
 
-        // Нэвтрэх амжилттай бол токен үүсгэх
+        // Token үүсгэхээс өмнө хуучин токеныг цэвэрлэвэл хурдан байна
+        $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
